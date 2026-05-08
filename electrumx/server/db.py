@@ -225,7 +225,9 @@ class DB(object):
         # Flush to file system
         self.flush_fs(flush_data)
 
-        # Then history
+        # Then history.  Stop before the 16-bit history flush id overflows;
+        # electrumx_server_autocompact.sh can catch exit 65 and compact safely.
+        self.check_history_flush_counter()
         self.flush_history()
 
         # Flush state last as it reads the wall time.
@@ -296,6 +298,9 @@ class DB(object):
 
     def flush_history(self):
         self.history.flush()
+
+    def check_history_flush_counter(self):
+        self.history.check_flush_counter(self.env.history_flush_count_max)
 
     def flush_utxo_db(self, batch, flush_data):
         '''Flush the cached DB writes and UTXO set to the batch.'''

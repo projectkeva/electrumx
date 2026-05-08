@@ -20,6 +20,10 @@ from electrumx.lib.util import pack_be_uint16, unpack_be_uint16_from
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 
 
+class HistoryFlushCountOverflowException(Exception):
+    pass
+
+
 class History(object):
 
     DB_VERSIONS = [0]
@@ -126,6 +130,18 @@ class History(object):
 
     def assert_flushed(self):
         assert not self.unflushed
+
+    def check_flush_counter(self, history_flush_count_max):
+        # Warn periodically, then stop before the 16-bit flush_id overflows.
+        if self.flush_count and self.flush_count % 1000 == 0:
+            self.logger.info(f'History flush_count is at {self.flush_count:d} '
+                             f'of {history_flush_count_max:d}')
+            if self.flush_count >= history_flush_count_max - 10000:
+                self.logger.warning('History needs to be compacted soon! See HOWTO')
+
+        if self.flush_count >= min(history_flush_count_max, 65535):
+            raise HistoryFlushCountOverflowException(
+                'History needs to be compacted now! See HOWTO')
 
     def flush(self):
         start_time = time.time()
